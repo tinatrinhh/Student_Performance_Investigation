@@ -1,0 +1,101 @@
+---
+title: "What Affects Student Performance on Exam?"
+author: "Tina Trinh"
+output: html_document
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+---
+
+```{r setup, include=FALSE}
+performance <- read.csv("StudentsPerformance.csv")
+library(randomForest)
+library(mosaic)
+library(rattle)
+library(rpart)
+library(tidyverse)
+library(dplyr)
+library("ggplot2")
+glimpse(performance)
+head(performance)
+```
+
+
+```{r, echo=FALSE}
+ggplot(performance, aes(x = math.score)) + geom_histogram(bins=20) + ggtitle("Figure 1: Distribution of students' math scores") + xlab("Math scores") + ylab("Number of students") 
+
+
+
+ggplot(performance, aes(y = math.score, x = test.preparation.course)) + geom_boxplot() + ggtitle("Figure 2: Math scores when completed test preparation course vs. incompleted") + xlab("Test preparation course") + ylab("Math score")
+
+
+ggplot(performance, aes(x = math.score)) + geom_density()
+
+```
+
+
+```{r, echo = FALSE}
+new_performance = performance %>% mutate(avg_score = mean(c(math.score, reading.score, writing.score)))
+glimpse(new_performance)
+
+```
+
+
+```{r, echo = FALSE}
+set.seed(1)
+test_id <- sample(1:nrow(new_performance), size=round(0.5*nrow(new_performance)))
+TEST <- new_performance[test_id,]
+TRAIN <- new_performance[-test_id,]
+
+
+
+
+# Decision tree 
+tree <- rpart(avg_score ~ test.preparation.course + gender, data= new_performance, na.action = na.pass)
+fancyRpartPlot(tree)
+
+# RMSE for decision tree
+TEST= TEST %>% mutate(prediction_tree= predict(tree, newdata = TEST))
+tree_rmse = (mean(TEST$prediction_tree - TEST$avg_score))^2
+
+
+# Linear model 
+model = lm(avg_score ~ test.preparation.course + gender, data = new_performance)
+summary(model)
+plot(model)
+
+
+# RMSE for linear model
+TEST= TEST %>% mutate(prediction_model= predict(model, newdata = TEST))
+linear_rmse = (mean(TEST$prediction_model - TEST$avg_score))^2
+
+
+# Random forest
+forest = randomForest(avg_score ~ test.preparation.course + gender , data= new_performance)
+forest
+
+
+# RMSE
+linear_rmse
+tree_rmse 
+
+
+```
+
+> Report 
+
+In this project, I will research about what potential factors that can affect students' performance in the exam. Specifically, I would see whether the test preparation would help the students in achieving higher scores.
+
+
+There are 8 variables in my dataset. The categorical variables in this dataset are gender, race ethnicity, parental level of education, lunch (type of lunch), and test preparation course. My categorical variables do not have many levels. The only variable that has level is the parental.level.of.education, but I am not interested in the students' parental level of education, so I don't find it necessary to adjust the variables. The numerical variables in this dataset are math score, reading score, and writing score. There's no NA in my dataset, which means there's no missing values in this dataset. I'm interested in finding the relationship between students' gender and their preparation for the test vs. their average test scores in the three tests (math, reading, and writing). Therefore, I'd add one more variable called 'avg_score', which would show the students' average scores on the three tests that they took
+ 
+ 
+For my first EDA plot, my explanatory variable is the math exam score of the students, and my response variable would be the number of students that take the math exam. For this first plot, I want to investigate the overall distribution of math exam scores of the students in order to give the general conclusion about the average of the math exam score of all the students that are in this study. For my second EDA plot, explanatory variable would be test preparation course (whether the students have completed or not completed the test preparation course) and my response variable would be the math exam score that they got. For this second plot, I want to examine whether the test preparation course would actually help the students to prepapre for the test, and then I'd compare the average math exam score of students who took the test preparation course with the overall average of the students who took the exam for the shake of this study. Based on my density ggplot, it shows that the distribution of the math score of the students are very closed to be normally distributed, therefore, there is no need for me to make a log transformation of the response variable.
+
+
+In Figure 1, the EDA plot show the distribution of the math score of the students. The distribution is unimodal that is skewed to the left. Based on the distribution, there would be potentially low outliers on the low end of the distribution. The mean of the math score is around 66, the median of the distribution is around 66.5. The range of the distribution is from 0.00 (minimum math score) to 100.00 (maximum math score). This plot is serve as a control of the research to see whether the students who completed the test preparation course would likely have higher average math score than overall students (that is, we would try to determine if the test preparation course help the students to get the math score that is higher than 66).
+
+
+In Figure 2, we would compare the median of the math score between those who completed the test preparation course versus the ones who did not complete. In this plot, we can clearly see that those who completed the test preparation course have higher median than those who did not complete, and the ones who completed the test preparation course did not have many low outliers than the ones who did not complete. This second EDA plot partly answer our question whether the test preparation course is a significant factor in determining the math score of the students. 
+
+The average math score for a student who completed the test preparation course is 69.6955. The average math score for a student who did not complet test preparation course is 64.0779. At a glance, students who completed the test preparation course have higher average math score than those who did not complete the test preparation course. 
+
+I then determine whether gender and the completeness of test preparation course would affect students' performance. Some students may not be good at math, therefore looking only on the math scores of the students may not be the best way to investigate how factors such as gender and test preparation course affect the performance of students on the exam. Therefore, it is necessary to introduces a new variable called 'avg_score', which is the average scores of the three tests (math, reading, and writing). The variable 'avg_score' would be my new response variable and I'd use it in my decision tree and linear model. The root mean square error (RMSE) measures the average difference between values predicted by a model and the actual values, therefore, the lower the RMSE, the better the plot in terms of predicting the values. The RMSE of the decision tree model is much lower than the linear model, which means the decision tree model is better in predicting the response variables in this dataset. 
